@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Quiz</title>
+</head>
+<body>
+
+<h1>CREATE</h1>
+
+<form method="POST">
+
+    <label>Name of the quiz</label><br>
+    <input type="text" name="quiz_name" required><br><br> #required- user cannot submit an empty field
+
+    <label>Term</label><br>
+    <input type="text" name="term" required><br><br>
+
+    <label>Definition / translation</label><br>
+    <input type="text" name="definition" required><br><br>
+
+    <!-- Buttons -->
+    <button type="submit" name="action" value="add">Add new term</button>
+    <button type="submit" name="action" value="finish">Finish quiz</button>
+
+</form>
+
+<br>
+<a href="/dashboard">Back to Dashboard</a>
+
+</body>
+</html>
