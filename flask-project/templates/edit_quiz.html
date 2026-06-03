@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}
+Edit Quiz
+{% endblock %}
+
+{% block content %}
+
+<h1>{{ quiz_name }}</h1>
+
+<table class="table table-striped">
+
+    <thead>
+        <tr>
+            <th>Term</th>
+            <th>Definition</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+
+    <tbody>
+
+    {% for word in words %}
+
+        <tr>
+
+            <td>{{ word[1] }}</td>
+
+            <td>{{ word[2] }}</td>
+
+            <td>
+
+                <a href="/edit_word/{{ word[0] }}"
+                   class="btn btn-lightblue">
+                    Edit
+                </a>
+
+                <a href="/delete_word/{{ word[0] }}"
+                   class="btn btn-danger">
+                    Delete
+                </a>
+
+            </td>
+
+        </tr>
+
+    {% endfor %}
+
+    </tbody>
+
+</table>
+
+<a href="/add_word/{{ quiz_id }}"
+   class="btn btn-pink">
+    Add New Word
+</a>
+
+{% endblock %}

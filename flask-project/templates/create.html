@@ -1,31 +1,59 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Create Quiz</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-<h1>CREATE</h1>
+{% block title %}
+Create Quiz
+{% endblock %}
+
+{% block content %}
+
+<h1>Create Quiz</h1>
 
 <form method="POST">
 
-    <label>Name of the quiz</label><br>
-    <input type="text" name="quiz_name" required><br><br> #required- user cannot submit an empty field
+    <div class="form-group">
+        <label>Name of the quiz</label>
+        <input type="text" name="quiz_name" class="form-control" required>
+    </div>
 
-    <label>Term</label><br>
-    <input type="text" name="term" required><br><br>
+    <div id="terms-container">
 
-    <label>Definition / translation</label><br>
-    <input type="text" name="definition" required><br><br>
+        <div class="row mb-3">
+            <div class="col">
+                <input type="text" name="term" class="form-control" placeholder="Term" required>
+            </div>
 
-    <!-- Buttons -->
-    <button type="submit" name="action" value="add">Add new term</button>
-    <button type="submit" name="action" value="finish">Finish quiz</button>
+            <div class="col">
+                <input type="text" name="definition" class="form-control" placeholder="Definition / translation" required>
+            </div>
+        </div>
+
+    </div>
+
+    <button type="button" class="btn btn-secondary" onclick="addTerm()">Add term</button>
+
+    <button type="submit" class="btn btn-primary">Finish quiz</button>
 
 </form>
 
-<br>
-<a href="/dashboard">Back to Dashboard</a>
+<script>
+function addTerm() {
+    let container = document.getElementById("terms-container");
 
-</body>
-</html>
+    let newRow = document.createElement("div");
+    newRow.className = "row mb-3";
+
+    newRow.innerHTML = `
+        <div class="col">
+            <input type="text" name="term" class="form-control" placeholder="Term" required>
+        </div>
+
+        <div class="col">
+            <input type="text" name="definition" class="form-control" placeholder="Definition / translation" required>
+        </div>
+    `;
+
+    container.appendChild(newRow);
+}
+</script>
+
+{% endblock %}

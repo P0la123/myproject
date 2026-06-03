@@ -118,78 +118,137 @@ def create():
 
     if request.method == "POST":
         quiz_name = request.form["quiz_name"]
-        term = request.form["term"]
-        definition = request.form["definition"]
-        action = request.form["action"] #add or finish
+
+        terms = request.form.getlist("term")
+        definitions = request.form.getlist("definition")
 
         connection = sqlite3.connect("database.db")
         cursor = connection.cursor()
 
-        # Get or create quiz
         cursor.execute(
-            "SELECT quiz_id FROM quizzes WHERE quiz_name = ? AND user_id = ?",
+            "INSERT INTO quizzes (quiz_name, user_id) VALUES (?, ?)",
             (quiz_name, session["user_id"])
         )
-        quiz = cursor.fetchone()
 
-        if quiz:
-            quiz_id = quiz[0]
-        else:
-            cursor.execute(
-                "INSERT INTO quizzes (quiz_name, user_id) VALUES (?, ?)",
-                (quiz_name, session["user_id"])
-            )
-            quiz_id = cursor.lastrowid
+        quiz_id = cursor.lastrowid
 
-        if action == "add":
+        for i in range(len(terms)):
             cursor.execute(
                 "INSERT INTO vocabulary (quiz_id, term, definition) VALUES (?, ?, ?)",
-                (quiz_id, term, definition)
-            ) #saving words
-            connection.commit()
-            connection.close()
+                (quiz_id, terms[i], definitions[i])
+            )
 
-            return redirect("/create")  #reloads the page to add more words - need to be fixed!!!
+        connection.commit()
+        connection.close()
 
-        elif action == "finish":
-            connection.commit()
-            connection.close()
-
-            return redirect("/dashboard")
+        return redirect("/dashboard")
 
     return render_template("create.html")
 
+@app.route("/library")
+def library():
+    if "user_id" not in session:
+        return redirect("/login")
+
+    connection = sqlite3.connect("database.db")
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "SELECT quiz_id, quiz_name FROM quizzes WHERE user_id = ?",
+        (session["user_id"],)
+    )
+
+    quizzes = cursor.fetchall()
+
+    connection.close()
+
+    return render_template("library.html", quizzes=quizzes)
+
+@app.route("/written_quiz/<int:quiz_id>")
+def written_quiz(quiz_id):
+    if "user_id" not in session:
+        return redirect("/login")
+
+    return "Written quiz page for quiz ID: " + str(quiz_id)
+
+
+@app.route("/multiple_choice_quiz/<int:quiz_id>")
+def multiple_choice_quiz(quiz_id):
+    if "user_id" not in session:
+        return redirect("/login")
+
+    return "Multiple choice quiz page for quiz ID: " + str(quiz_id)
+
+
+@app.route("/edit_quiz/<int:quiz_id>")
+def edit_quiz(quiz_id):
+
+    if "user_id" not in session:
+        return redirect("/login")
+
+    connection = sqlite3.connect("database.db")
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT word_id, term, definition
+        FROM vocabulary
+        WHERE quiz_id = ?
+        """,
+        (quiz_id,)
+    )
+
+    words = cursor.fetchall()
+
+    cursor.execute(
+        """
+        SELECT quiz_name
+        FROM quizzes
+        WHERE quiz_id = ?
+        """,
+        (quiz_id,)
+    )
+
+    quiz_name = cursor.fetchone()[0]
+
+    connection.close()
+
+    return render_template(
+        "edit_quiz.html",
+        words=words,
+        quiz_id=quiz_id,
+        quiz_name=quiz_name
+    )
+
+@app.route("/delete_word/<int:word_id>")
+def delete_word(word_id):
+
+    connection = sqlite3.connect("database.db")
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "SELECT quiz_id FROM vocabulary WHERE word_id = ?",
+        (word_id,)
+    )
+
+    quiz_id = cursor.fetchone()[0]
+
+    cursor.execute(
+        "DELETE FROM vocabulary WHERE word_id = ?",
+        (word_id,)
+    )
+
+    connection.commit()
+    connection.close()
+
+    return redirect(f"/edit_quiz/{quiz_id}")
 
 
 
 
-# @app.route("/register")
-# def register():
-#     return "Register Page"
 
-# @app.route("/login")
-# def login():
-#     return "Login Page"
 
-# @app.route("/logout")
-# def logout():
-#     return "Logout Page"
 
-# @app.route("/add")
-# def add():
-#     return "Add Vocabulary Page"
-
-# @app.route("/manage")
-# def manage():
-#     return "Manage Vocabulary Page"
-
-# @app.route("/quiz")
-# def quiz():
-#     return "Quiz Page"
-
-# @app.route("/results")
-# def results():
-#     return "Results Page"
 
 if __name__ == "__main__":
     init_db()

@@ -1,18 +1,22 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Dashboard</title>
-</head>
-<body>
+{% extends "base.html" %}
+    
+{% block title%}
+Dashboard
+{% endblock %}
 
-<h1>Welcome, {{ username }}</h1> #jinja template - allows flask to insert python data into HTML
+{% block content%}
+
+<h1>Welcome, {{ username }}</h1> <!--jinja template - allows flask to insert python data into HTML-->
 
 <p>Select an option:</p>
+
+<div class=" list- group w-25">
 
 <a href="/create">Create</a><br><br>
 <a href="/library">Library</a><br><br>
 <a href="/results">Results file</a><br><br>
 <a href="/logout">Logout</a>
 
-</body>
-</html>
+</div>
+
+{% endblock %}
