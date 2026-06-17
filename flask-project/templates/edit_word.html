@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}
+Edit Word
+{% endblock %}
+
+{% block content %}
+
+<h1>Edit Word</h1>
+
+<form method="POST">
+
+    <input type="hidden" name="quiz_id" value="{{ word[1] }}">
+
+    <div id="terms-container">
+
+        <div class="row mb-3">
+
+            <div class="col">
+                <input
+                    type="text"
+                    name="term"
+                    class="form-control"
+                    value="{{ word[2] }}"
+                    required>
+            </div>
+
+            <div class="col">
+                <input
+                    type="text"
+                    name="definition"
+                    class="form-control"
+                    value="{{ word[3] }}"
+                    required>
+            </div>
+
+        </div>
+
+    </div>
+
+    <button type="submit" class="btn btn-pink">
+        Save Changes
+    </button>
+
+    <a href="/edit_quiz/{{ word[1] }}"
+       class="btn btn-secondary">
+        Cancel
+    </a>
+
+</form>
+
+{% endblock %}

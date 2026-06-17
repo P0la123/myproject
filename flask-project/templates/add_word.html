@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}
+Add Word
+{% endblock %}
+
+{% block content %}
+
+<h1>Add New Word</h1>
+
+<form method="POST">
+
+    <div id="terms-container">
+
+        <div class="row mb-3">
+            <div class="col">
+                <input type="text" name="term" class="form-control" placeholder="Term" required>
+            </div>
+
+            <div class="col">
+                <input type="text" name="definition" class="form-control" placeholder="Definition / translation" required>
+            </div>
+        </div>
+
+    </div>
+
+    <button type="button" class="btn btn-secondary" onclick="addTerm()">
+        Add another term
+    </button>
+
+    <button type="submit" class="btn btn-pink">
+        Save words
+    </button>
+
+    <a href="/edit_quiz/{{ quiz_id }}" class="btn btn-lightblue">
+        Cancel
+    </a>
+
+</form>
+
+<script>
+function addTerm() {
+    let container = document.getElementById("terms-container");
+
+    let newRow = document.createElement("div");
+    newRow.className = "row mb-3";
+
+    newRow.innerHTML = `
+        <div class="col">
+            <input type="text" name="term" class="form-control" placeholder="Term" required>
+        </div>
+
+        <div class="col">
+            <input type="text" name="definition" class="form-control" placeholder="Definition / translation" required>
+        </div>
+    `;
+
+    container.appendChild(newRow);
+}
+</script>
+
+{% endblock %}

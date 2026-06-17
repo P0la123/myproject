@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}
+Written Quiz
+{% endblock %}
+
+{% block content %}
+
+<h1>Written Question Quiz</h1>
+
+<form method="POST">
+
+    <div id="terms-container">
+
+        {% for word in words %}
+
+        <div class="row mb-3">
+
+            <div class="col">
+
+                <input
+                    type="text"
+                    class="form-control"
+                    value="{{ word[1] }}"
+                    readonly>
+
+            </div>
+
+            <div class="col">
+
+                <input
+                    type="text"
+                    name="answer_{{ word[0] }}"
+                    class="form-control"
+                    placeholder="Definition / translation"
+                    required>
+
+            </div>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+    <button type="submit" class="btn btn-pink">
+        Submit Answers
+    </button>
+
+</form>
+
+{% endblock %}

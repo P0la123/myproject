@@ -1,4 +1,5 @@
-import sqlite3
+import sqlite3, random
+from classes import QuizSession, Result
 from flask import Flask, render_template, request, session, redirect #request- handles form data, redirect- sends user to another page
                                                                                                                                         
 app = Flask(__name__)
@@ -164,13 +165,6 @@ def library():
 
     return render_template("library.html", quizzes=quizzes)
 
-@app.route("/written_quiz/<int:quiz_id>")
-def written_quiz(quiz_id):
-    if "user_id" not in session:
-        return redirect("/login")
-
-    return "Written quiz page for quiz ID: " + str(quiz_id)
-
 
 @app.route("/multiple_choice_quiz/<int:quiz_id>")
 def multiple_choice_quiz(quiz_id):
@@ -243,12 +237,258 @@ def delete_word(word_id):
 
     return redirect(f"/edit_quiz/{quiz_id}")
 
+@app.route("/edit_word/<int:word_id>", methods=["GET", "POST"])
+def edit_word(word_id):
+
+    if "user_id" not in session:
+        return redirect("/login")
+
+    connection = sqlite3.connect("database.db")
+    cursor = connection.cursor()
+
+    if request.method == "POST":
+        term = request.form["term"]
+        definition = request.form["definition"]
+        quiz_id = request.form["quiz_id"]
+
+        cursor.execute(
+            """
+            UPDATE vocabulary
+            SET term = ?, definition = ?
+            WHERE word_id = ?
+            """,
+            (term, definition, word_id)
+        )
+
+        connection.commit()
+        connection.close()
+
+        return redirect(f"/edit_quiz/{quiz_id}")
+
+    cursor.execute(
+        """
+        SELECT word_id, quiz_id, term, definition
+        FROM vocabulary
+        WHERE word_id = ?
+        """,
+        (word_id,)
+    )
+
+    word = cursor.fetchone()
+
+    connection.close()
+
+    return render_template("edit_word.html", word=word)
 
 
+@app.route("/add_word/<int:quiz_id>", methods=["GET", "POST"])
+def add_word(quiz_id):
+
+    if "user_id" not in session:
+        return redirect("/login")
+
+    if request.method == "POST":
+
+        terms = request.form.getlist("term")
+        definitions = request.form.getlist("definition")
+
+        connection = sqlite3.connect("database.db")
+        cursor = connection.cursor()
+
+        for i in range(len(terms)):
+            cursor.execute(
+                "INSERT INTO vocabulary (quiz_id, term, definition) VALUES (?, ?, ?)",
+                (quiz_id, terms[i], definitions[i])
+            )
+
+        connection.commit()
+        connection.close()
+
+        return redirect(f"/edit_quiz/{quiz_id}")
+
+    return render_template("add_word.html", quiz_id=quiz_id)
 
 
+@app.route("/written_quiz/<int:quiz_id>", methods=["GET", "POST"])
+def written_quiz(quiz_id):
 
+    if "user_id" not in session:
+        return redirect("/login")
 
+    connection = sqlite3.connect("database.db")
+    cursor = connection.cursor()
+
+    # Get words from selected quiz
+    cursor.execute(
+        """
+        SELECT word_id, term, definition
+        FROM vocabulary
+        WHERE quiz_id = ?
+        """,
+        (quiz_id,)
+    )
+
+    words = cursor.fetchall()
+
+    # Randomize question order
+    random.shuffle(words)
+
+    # User submitted answers
+    if request.method == "POST":
+
+        score = 0
+        incorrect_words = []
+        feedback = []
+
+        for word in words:
+
+            word_id = word[0]
+            term = word[1]
+            correct_definition = word[2]
+
+            user_answer = request.form[
+                f"answer_{word_id}"
+            ]
+
+            if (
+                user_answer.strip().lower()
+                ==
+                correct_definition.strip().lower()
+            ):
+
+                score += 1
+
+                feedback.append(
+                    (
+                        term,
+                        user_answer,
+                        correct_definition,
+                        "Correct"
+                    )
+                )
+
+            else:
+
+                incorrect_words.append(word)
+
+                feedback.append(
+                    (
+                        term,
+                        user_answer,
+                        correct_definition,
+                        "Incorrect"
+                    )
+                )
+
+        connection.close()
+
+        session["incorrect_word_ids"] = [word[0] for word in incorrect_words]
+
+        return render_template(
+            "written_result.html",
+            score=score,
+            total_questions=len(words),
+            incorrect_words=incorrect_words,
+            feedback=feedback,
+            quiz_id=quiz_id
+        )
+
+    connection.close()
+
+    return render_template(
+        "written_quiz.html",
+        words=words,
+        quiz_id=quiz_id
+    )
+
+@app.route("/repeat_incorrect/<int:quiz_id>", methods=["GET", "POST"])
+def repeat_incorrect(quiz_id):
+
+    if "user_id" not in session:
+        return redirect("/login")
+
+    incorrect_ids = session.get("incorrect_word_ids", [])
+
+    if not incorrect_ids:
+        return redirect(f"/written_quiz/{quiz_id}")
+
+    connection = sqlite3.connect("database.db")
+    cursor = connection.cursor()
+
+    placeholders = ",".join(["?"] * len(incorrect_ids))
+
+    cursor.execute(
+        f"""
+        SELECT word_id, term, definition
+        FROM vocabulary
+        WHERE word_id IN ({placeholders})
+        """,
+        incorrect_ids
+    )
+
+    words = cursor.fetchall()
+
+    if request.method == "POST":
+
+        score = 0
+        feedback = []
+        new_incorrect_ids = []
+
+        for word in words:
+
+            word_id = word[0]
+            term = word[1]
+            correct_definition = word[2]
+
+            user_answer = request.form[f"answer_{word_id}"]
+
+            if user_answer.strip().lower() == correct_definition.strip().lower():
+
+                score += 1
+
+                feedback.append(
+                    (
+                        term,
+                        user_answer,
+                        correct_definition,
+                        "Correct"
+                    )
+                )
+
+            else:
+
+                new_incorrect_ids.append(word_id)
+
+                feedback.append(
+                    (
+                        term,
+                        user_answer,
+                        correct_definition,
+                        "Incorrect"
+                    )
+                )
+
+        session["incorrect_word_ids"] = new_incorrect_ids
+
+        connection.close()
+
+        return render_template(
+            "written_result.html",
+            score=score,
+            total_questions=len(words),
+            feedback=feedback,
+            quiz_id=quiz_id
+        )
+
+    random.shuffle(words)
+
+    connection.close()
+
+    return render_template(
+        "written_quiz.html",
+        words=words,
+        quiz_id=quiz_id
+    )
 
 if __name__ == "__main__":
     init_db()

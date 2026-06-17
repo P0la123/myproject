@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}
+Quiz Results
+{% endblock %}
+
+{% block content %}
+
+<div class="card text-center mb-4">
+
+    <div class="card-header">
+        Written Question Quiz
+    </div>
+
+    <div class="card-body">
+
+        <h2 class="card-title">
+            Score: {{ score }} / {{ total_questions }}
+        </h2>
+
+        <p class="card-text">
+            Review your answers below.
+        </p>
+
+    </div>
+
+</div>
+
+<table class="table table-hover">
+
+    <thead class="thead-light">
+
+        <tr>
+            <th>Term</th>
+            <th>Your Answer</th>
+            <th>Correct Answer</th>
+            <th>Result</th>
+        </tr>
+
+    </thead>
+
+    <tbody>
+
+        {% for item in feedback %}
+
+        <tr>
+
+            <td>{{ item[0] }}</td>
+
+            <td>{{ item[1] }}</td>
+
+            <td>{{ item[2] }}</td>
+
+            <td>
+
+                {% if item[3] == "Correct" %}
+
+                    <span class="badge badge-success">
+                        Correct
+                    </span>
+
+                {% else %}
+
+                    <span class="badge badge-danger">
+                        Incorrect
+                    </span>
+
+                {% endif %}
+
+            </td>
+
+        </tr>
+
+        {% endfor %}
+
+    </tbody>
+
+</table>
+
+<div class="text-center">
+
+    <a href="/written_quiz/{{ quiz_id }}"
+       class="btn btn-pink btn-lg mr-2">
+        Try Again
+    </a>
+
+    {% if session.get("incorrect_word_ids") %}
+
+    <a href="/repeat_incorrect/{{ quiz_id }}"
+        class="btn btn-warning btn-lg mr-2">
+        Repeat Incorrect Answers
+    </a>
+
+{% endif %}
+
+    <a href="/library"
+       class="btn btn-lightblue btn-lg">
+        Back to Library
+    </a>
+
+</div>
+
+{% endblock %}
