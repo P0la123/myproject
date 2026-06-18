@@ -7,6 +7,13 @@ class QuizSession:
         self.current_question = 0
         self.incorrect_words = []
 
+    def __init__(self, quiz_id, words):
+        self.quiz_id = quiz_id
+        self.words = words
+        self.current_question = 0
+        self.score = 0
+        self.incorrect_word_ids = []
+
 class Result:
 
     def __init__(self, quiz_id, score, total_questions):

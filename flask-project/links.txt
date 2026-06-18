@@ -1,0 +1,10 @@
+https://getbootstrap.com/docs/4.3/getting-started/introduction/
+https://getbootstrap.com/docs/4.3/components/forms/ (+ radios)
+https://getbootstrap.com/docs/4.3/components/navbar/
+https://getbootstrap.com/docs/4.3/components/buttons/
+https://getbootstrap.com/docs/4.3/components/forms/
+https://getbootstrap.com/docs/4.3/components/card/
+https://www.youtube.com/watch?v=xIgPMguqyws&list=PLzMcBGfZo4-n4vJJybUVV3Un_NFS5EOgX&index=3
+https://www.youtube.com/watch?v=4nzI4RKwb5I&list=PLzMcBGfZo4-n4vJJybUVV3Un_NFS5EOgX&index=3
+https://www.youtube.com/watch?v=9MHYHgh4jYc&list=PLzMcBGfZo4-n4vJJybUVV3Un_NFS5EOgX&index=4
+

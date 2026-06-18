@@ -165,15 +165,6 @@ def library():
 
     return render_template("library.html", quizzes=quizzes)
 
-
-@app.route("/multiple_choice_quiz/<int:quiz_id>")
-def multiple_choice_quiz(quiz_id):
-    if "user_id" not in session:
-        return redirect("/login")
-
-    return "Multiple choice quiz page for quiz ID: " + str(quiz_id)
-
-
 @app.route("/edit_quiz/<int:quiz_id>")
 def edit_quiz(quiz_id):
 
@@ -318,177 +309,429 @@ def written_quiz(quiz_id):
     connection = sqlite3.connect("database.db")
     cursor = connection.cursor()
 
-    # Get words from selected quiz
-    cursor.execute(
-        """
-        SELECT word_id, term, definition
-        FROM vocabulary
-        WHERE quiz_id = ?
-        """,
-        (quiz_id,)
-    )
+    # Start a new quiz attempt
+    if request.method == "GET":
 
-    words = cursor.fetchall()
+        cursor.execute(
+            """
+            SELECT word_id, term, definition
+            FROM vocabulary
+            WHERE quiz_id = ?
+            """,
+            (quiz_id,)
+        )
 
-    # Randomize question order
-    random.shuffle(words)
+        words = cursor.fetchall()
+        random.shuffle(words)
 
-    # User submitted answers
-    if request.method == "POST":
-
-        score = 0
-        incorrect_words = []
-        feedback = []
-
-        for word in words:
-
-            word_id = word[0]
-            term = word[1]
-            correct_definition = word[2]
-
-            user_answer = request.form[
-                f"answer_{word_id}"
-            ]
-
-            if (
-                user_answer.strip().lower()
-                ==
-                correct_definition.strip().lower()
-            ):
-
-                score += 1
-
-                feedback.append(
-                    (
-                        term,
-                        user_answer,
-                        correct_definition,
-                        "Correct"
-                    )
-                )
-
-            else:
-
-                incorrect_words.append(word)
-
-                feedback.append(
-                    (
-                        term,
-                        user_answer,
-                        correct_definition,
-                        "Incorrect"
-                    )
-                )
+        session["quiz_words"] = words
+        session["current_question"] = 0
+        session["score"] = 0
+        session["incorrect_word_ids"] = []
+        session["feedback"] = []
 
         connection.close()
 
-        session["incorrect_word_ids"] = [word[0] for word in incorrect_words]
+    # Check submitted answer
+    if request.method == "POST":
+
+        words = session["quiz_words"]
+        current_question = session["current_question"]
+
+        word = words[current_question]
+
+        word_id = word[0]
+        term = word[1]
+        correct_definition = word[2]
+
+        user_answer = request.form["answer"]
+
+        if user_answer.strip().lower() == correct_definition.strip().lower():
+            session["score"] += 1
+
+            session["feedback"].append(
+                (term, user_answer, correct_definition, "Correct")
+            )
+
+        else:
+            session["incorrect_word_ids"].append(word_id)
+
+            session["feedback"].append(
+                (term, user_answer, correct_definition, "Incorrect")
+            )
+
+        session["current_question"] += 1
+
+    words = session["quiz_words"]
+    current_question = session["current_question"]
+
+    # If quiz finished
+    if current_question >= len(words):
 
         return render_template(
             "written_result.html",
-            score=score,
+            score=session["score"],
             total_questions=len(words),
-            incorrect_words=incorrect_words,
-            feedback=feedback,
+            feedback=session["feedback"],
             quiz_id=quiz_id
         )
 
-    connection.close()
+    # Show next question
+    word = words[current_question]
 
     return render_template(
         "written_quiz.html",
-        words=words,
+        word=word,
+        question_number=current_question + 1,
+        total_questions=len(words),
         quiz_id=quiz_id
     )
 
-@app.route("/repeat_incorrect/<int:quiz_id>", methods=["GET", "POST"])
-def repeat_incorrect(quiz_id):
+@app.route("/repeat_incorrect_written/<int:quiz_id>", methods=["GET", "POST"])
+def repeat_incorrect_written(quiz_id):
 
     if "user_id" not in session:
         return redirect("/login")
 
-    incorrect_ids = session.get("incorrect_word_ids", [])
+    # START repeating incorrect questions
+    if request.method == "GET":
 
-    if not incorrect_ids:
-        return redirect(f"/written_quiz/{quiz_id}")
+        incorrect_ids = session.get("incorrect_word_ids", [])
 
-    connection = sqlite3.connect("database.db")
-    cursor = connection.cursor()
+        if not incorrect_ids:
+            return redirect(f"/written_quiz/{quiz_id}")
 
-    placeholders = ",".join(["?"] * len(incorrect_ids))
+        connection = sqlite3.connect("database.db")
+        cursor = connection.cursor()
 
-    cursor.execute(
-        f"""
-        SELECT word_id, term, definition
-        FROM vocabulary
-        WHERE word_id IN ({placeholders})
-        """,
-        incorrect_ids
-    )
+        placeholders = ",".join(["?"] * len(incorrect_ids))
 
-    words = cursor.fetchall()
+        cursor.execute(
+            f"""
+            SELECT word_id, term, definition
+            FROM vocabulary
+            WHERE word_id IN ({placeholders})
+            """,
+            incorrect_ids
+        )
 
+        words = cursor.fetchall()
+        random.shuffle(words)
+
+        connection.close()
+
+        session["quiz_words"] = words
+        session["current_question"] = 0
+        session["score"] = 0
+        session["feedback"] = []
+
+    # CHECK repeated answer
     if request.method == "POST":
 
-        score = 0
-        feedback = []
-        new_incorrect_ids = []
+        words = session["quiz_words"]
+        current_question = session["current_question"]
+
+        word = words[current_question]
+
+        word_id = word[0]
+        term = word[1]
+        correct_definition = word[2]
+
+        user_answer = request.form["answer"]
+
+        if user_answer.strip().lower() == correct_definition.strip().lower():
+
+            session["score"] += 1
+
+            session["feedback"].append(
+                (term, user_answer, correct_definition, "Correct")
+            )
+
+            # remove from incorrect list if now correct
+            if word_id in session["incorrect_word_ids"]:
+                session["incorrect_word_ids"].remove(word_id)
+
+        else:
+
+            session["feedback"].append(
+                (term, user_answer, correct_definition, "Incorrect")
+            )
+
+        session["current_question"] += 1
+
+    words = session["quiz_words"]
+    current_question = session["current_question"]
+
+    if current_question >= len(words):
+
+        return render_template(
+            "written_result.html",
+            score=session["score"],
+            total_questions=len(words),
+            feedback=session["feedback"],
+            quiz_id=quiz_id,
+            quiz_type="written"
+        )
+
+    word = words[current_question]
+
+    return render_template(
+        "written_quiz.html",
+        word=word,
+        question_number=current_question + 1,
+        total_questions=len(words),
+        quiz_id=quiz_id
+    )
+
+@app.route("/multiple_choice_quiz/<int:quiz_id>", methods=["GET", "POST"])
+def multiple_choice_quiz(quiz_id):
+
+    if "user_id" not in session:
+        return redirect("/login")
+
+    if request.method == "GET":
+
+        connection = sqlite3.connect("database.db")
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT word_id, term, definition
+            FROM vocabulary
+            WHERE quiz_id = ?
+            """,
+            (quiz_id,)
+        )
+
+        words = cursor.fetchall()
+        random.shuffle(words)
+
+        questions = []
 
         for word in words:
-
             word_id = word[0]
             term = word[1]
             correct_definition = word[2]
 
-            user_answer = request.form[f"answer_{word_id}"]
+            wrong_options = []
 
-            if user_answer.strip().lower() == correct_definition.strip().lower():
+            for other_word in words:
+                if other_word[0] != word_id:
+                    wrong_options.append(other_word[2])
 
-                score += 1
+            wrong_options = random.sample(
+                wrong_options,
+                min(3, len(wrong_options))
+            )
 
-                feedback.append(
-                    (
-                        term,
-                        user_answer,
-                        correct_definition,
-                        "Correct"
-                    )
-                )
+            options = wrong_options + [correct_definition]
+            random.shuffle(options)
 
-            else:
-
-                new_incorrect_ids.append(word_id)
-
-                feedback.append(
-                    (
-                        term,
-                        user_answer,
-                        correct_definition,
-                        "Incorrect"
-                    )
-                )
-
-        session["incorrect_word_ids"] = new_incorrect_ids
+            questions.append(
+                (word_id, term, correct_definition, options)
+            )
 
         connection.close()
 
+        session["mc_questions"] = questions
+        session["current_question"] = 0
+        session["score"] = 0
+        session["feedback"] = []
+        session["incorrect_word_ids"] = []
+
+    if request.method == "POST":
+
+        questions = session["mc_questions"]
+        current_question = session["current_question"]
+
+        question = questions[current_question]
+
+        word_id = question[0]
+        term = question[1]
+        correct_definition = question[2]
+
+        user_answer = request.form["answer"]
+
+        if user_answer == correct_definition:
+            session["score"] += 1
+
+            session["feedback"].append(
+                (term, user_answer, correct_definition, "Correct")
+            )
+
+        else:
+            session["incorrect_word_ids"].append(word_id)
+
+            session["feedback"].append(
+                (term, user_answer, correct_definition, "Incorrect")
+            )
+
+        session["current_question"] += 1
+
+    questions = session["mc_questions"]
+    current_question = session["current_question"]
+
+    if current_question >= len(questions):
+
         return render_template(
             "written_result.html",
-            score=score,
-            total_questions=len(words),
-            feedback=feedback,
-            quiz_id=quiz_id
+            score=session["score"],
+            total_questions=len(questions),
+            feedback=session["feedback"],
+            quiz_id=quiz_id,
+            quiz_type="multiple_choice"
         )
 
-    random.shuffle(words)
-
-    connection.close()
+    question = questions[current_question]
 
     return render_template(
-        "written_quiz.html",
-        words=words,
+        "multiple_choice_quiz.html",
+        question=question,
+        question_number=current_question + 1,
+        total_questions=len(questions),
         quiz_id=quiz_id
     )
+
+@app.route("/repeat_incorrect_mc/<int:quiz_id>", methods=["GET", "POST"])
+def repeat_incorrect_mc(quiz_id):
+
+    if "user_id" not in session:
+        return redirect("/login")
+
+    if request.method == "GET":
+
+        incorrect_ids = session.get("incorrect_word_ids", [])
+
+        if not incorrect_ids:
+            return redirect(f"/multiple_choice_quiz/{quiz_id}")
+
+        connection = sqlite3.connect("database.db")
+        cursor = connection.cursor()
+
+        placeholders = ",".join(["?"] * len(incorrect_ids))
+
+        cursor.execute(
+            f"""
+            SELECT word_id, term, definition
+            FROM vocabulary
+            WHERE word_id IN ({placeholders})
+            """,
+            incorrect_ids
+        )
+
+        words = cursor.fetchall()
+
+        cursor.execute(
+            """
+            SELECT word_id, term, definition
+            FROM vocabulary
+            WHERE quiz_id = ?
+            """,
+            (quiz_id,)
+        )
+
+        all_words = cursor.fetchall()
+
+        connection.close()
+
+        random.shuffle(words)
+
+        questions = []
+
+        for word in words:
+            word_id = word[0]
+            term = word[1]
+            correct_definition = word[2]
+
+            wrong_options = []
+
+            for other_word in all_words:
+                if other_word[0] != word_id:
+                    wrong_options.append(other_word[2])
+
+            wrong_options = random.sample(
+                wrong_options,
+                min(3, len(wrong_options))
+            )
+
+            options = wrong_options + [correct_definition]
+            random.shuffle(options)
+
+            questions.append(
+                (word_id, term, correct_definition, options)
+            )
+
+        session["mc_questions"] = questions
+        session["current_question"] = 0
+        session["score"] = 0
+        session["feedback"] = []
+
+    if request.method == "POST":
+
+        questions = session["mc_questions"]
+        current_question = session["current_question"]
+
+        question = questions[current_question]
+
+        word_id = question[0]
+        term = question[1]
+        correct_definition = question[2]
+
+        user_answer = request.form["answer"]
+
+        if user_answer == correct_definition:
+
+            session["score"] += 1
+
+            session["feedback"].append(
+                (term, user_answer, correct_definition, "Correct")
+            )
+
+            if word_id in session["incorrect_word_ids"]:
+                session["incorrect_word_ids"].remove(word_id)
+
+        else:
+
+            session["feedback"].append(
+                (term, user_answer, correct_definition, "Incorrect")
+            )
+
+        session["current_question"] += 1
+
+    questions = session["mc_questions"]
+    current_question = session["current_question"]
+
+    if current_question >= len(questions):
+
+        return render_template(
+            "written_result.html",
+            score=session["score"],
+            total_questions=len(questions),
+            feedback=session["feedback"],
+            quiz_id=quiz_id,
+            quiz_type="multiple_choice"
+        )
+
+    question = questions[current_question]
+
+    return render_template(
+        "multiple_choice_quiz.html",
+        question=question,
+        question_number=current_question + 1,
+        total_questions=len(questions),
+        quiz_id=quiz_id
+    )
+
+@app.route("/repeat_incorrect/<quiz_type>/<int:quiz_id>")
+def repeat_incorrect_choice(quiz_type, quiz_id):
+
+    if quiz_type == "written":
+        return redirect(f"/repeat_incorrect_written/{quiz_id}")
+
+    elif quiz_type == "multiple_choice":
+        return redirect(f"/repeat_incorrect_mc/{quiz_id}")
+
+    return redirect("/library")
 
 if __name__ == "__main__":
     init_db()

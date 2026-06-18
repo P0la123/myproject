@@ -86,7 +86,7 @@ Quiz Results
 
     {% if session.get("incorrect_word_ids") %}
 
-    <a href="/repeat_incorrect/{{ quiz_id }}"
+    <a href="/repeat_incorrect/{{ quiz_type }}/{{ quiz_id }}"
         class="btn btn-warning btn-lg mr-2">
         Repeat Incorrect Answers
     </a>

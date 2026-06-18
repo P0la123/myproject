@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}
+Multiple Choice Quiz
+{% endblock %}
+
+{% block content %}
+
+<h1>Multiple Choice Quiz</h1>
+
+<p>
+    Question {{ question_number }} / {{ total_questions }}
+</p>
+
+<form method="POST">
+
+    <div id="terms-container">
+
+        <div class="row mb-3">
+
+            <div class="col">
+                <input
+                    type="text"
+                    class="form-control"
+                    value="{{ question[1] }}"
+                    readonly>
+            </div>
+
+            <div class="col">
+
+                {% for option in question[3] %}
+
+                <div class="form-check mb-2">
+
+                    <input
+                        class="form-check-input"
+                        type="radio"
+                        name="answer"
+                        value="{{ option }}"
+                        required>
+
+                    <label class="form-check-label">
+                        {{ option }}
+                    </label>
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <button type="submit" class="btn btn-pink btn-lg">
+        Next
+    </button>
+
+</form>
+
+{% endblock %}
