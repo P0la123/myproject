@@ -155,7 +155,12 @@ def library():
     cursor = connection.cursor()
 
     cursor.execute(
-        "SELECT quiz_id, quiz_name FROM quizzes WHERE user_id = ?",
+        """
+        SELECT quiz_id, quiz_name
+        FROM quizzes
+        WHERE user_id = ?
+        ORDER BY quiz_id DESC
+        """,
         (session["user_id"],)
     )
 
@@ -306,11 +311,10 @@ def written_quiz(quiz_id):
     if "user_id" not in session:
         return redirect("/login")
 
-    connection = sqlite3.connect("database.db")
-    cursor = connection.cursor()
-
-    # Start a new quiz attempt
     if request.method == "GET":
+
+        connection = sqlite3.connect("database.db")
+        cursor = connection.cursor()
 
         cursor.execute(
             """
@@ -324,15 +328,14 @@ def written_quiz(quiz_id):
         words = cursor.fetchall()
         random.shuffle(words)
 
+        connection.close()
+
         session["quiz_words"] = words
         session["current_question"] = 0
         session["score"] = 0
         session["incorrect_word_ids"] = []
         session["feedback"] = []
 
-        connection.close()
-
-    # Check submitted answer
     if request.method == "POST":
 
         words = session["quiz_words"]
@@ -348,14 +351,11 @@ def written_quiz(quiz_id):
 
         if user_answer.strip().lower() == correct_definition.strip().lower():
             session["score"] += 1
-
             session["feedback"].append(
                 (term, user_answer, correct_definition, "Correct")
             )
-
         else:
             session["incorrect_word_ids"].append(word_id)
-
             session["feedback"].append(
                 (term, user_answer, correct_definition, "Incorrect")
             )
@@ -365,18 +365,17 @@ def written_quiz(quiz_id):
     words = session["quiz_words"]
     current_question = session["current_question"]
 
-    # If quiz finished
     if current_question >= len(words):
 
         return render_template(
-            "written_result.html",
+            "quiz_result.html",
             score=session["score"],
             total_questions=len(words),
             feedback=session["feedback"],
-            quiz_id=quiz_id
+            quiz_id=quiz_id,
+            quiz_type="written"
         )
 
-    # Show next question
     word = words[current_question]
 
     return render_template(
@@ -465,7 +464,7 @@ def repeat_incorrect_written(quiz_id):
     if current_question >= len(words):
 
         return render_template(
-            "written_result.html",
+            "quiz_result.html",
             score=session["score"],
             total_questions=len(words),
             feedback=session["feedback"],
@@ -574,7 +573,7 @@ def multiple_choice_quiz(quiz_id):
     if current_question >= len(questions):
 
         return render_template(
-            "written_result.html",
+            "quiz_result.html",
             score=session["score"],
             total_questions=len(questions),
             feedback=session["feedback"],
@@ -704,7 +703,7 @@ def repeat_incorrect_mc(quiz_id):
     if current_question >= len(questions):
 
         return render_template(
-            "written_result.html",
+            "quiz_result.html",
             score=session["score"],
             total_questions=len(questions),
             feedback=session["feedback"],

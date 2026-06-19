@@ -79,10 +79,21 @@ Quiz Results
 
 <div class="text-center">
 
+    {% if quiz_type == "written" %}
+
     <a href="/written_quiz/{{ quiz_id }}"
-       class="btn btn-pink btn-lg mr-2">
+        class="btn btn-pink btn-lg mr-2">
         Try Again
     </a>
+
+    {% elif quiz_type == "multiple_choice" %}
+
+    <a href="/multiple_choice_quiz/{{ quiz_id }}"
+        class="btn btn-pink btn-lg mr-2">
+        Try Again
+    </a>
+
+    {% endif %}
 
     {% if session.get("incorrect_word_ids") %}
 
