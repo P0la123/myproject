@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}
+Results History
+{% endblock %}
+
+{% block content %}
+
+<h1>Results History</h1>
+
+<p>Here you can see your previous quiz results.</p>
+
+{% if results %}
+
+<table class="table table-hover">
+
+    <thead class="thead-light">
+        <tr>
+            <th>Quiz</th>
+            <th>Quiz Type</th>
+            <th>Score</th>
+            <th>Percentage</th>
+            <th>Date</th>
+        </tr>
+    </thead>
+
+    <tbody>
+
+        {% for result in results %}
+
+        <tr>
+            <td>{{ result[0] }}</td>
+
+            <td>
+                {% if result[1] == "written" %}
+                    Written
+                {% elif result[1] == "multiple_choice" %}
+                    Multiple Choice
+                {% endif %}
+            </td>
+
+            <td>
+                {{ result[2] }} / {{ result[3] }}
+            </td>
+
+            <td>
+                {{ ((result[2] / result[3]) * 100) | round(0) }}%
+            </td>
+
+            <td>
+                {{ result[4][8:10] }}/{{ result[4][5:7] }}/{{ result[4][0:4] }}
+                {{ result[4][11:16] }}
+            </td>
+        </tr>
+
+        {% endfor %}
+
+    </tbody>
+
+</table>
+
+{% else %}
+
+<div class="alert alert-info">
+    You do not have any quiz results yet.
+</div>
+
+{% endif %}
+
+{% endblock %}

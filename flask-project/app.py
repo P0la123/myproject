@@ -1,6 +1,8 @@
 import sqlite3, random
 from classes import QuizSession, Result
 from flask import Flask, render_template, request, session, redirect #request- handles form data, redirect- sends user to another page
+from datetime import datetime
+from zoneinfo import ZoneInfo
                                                                                                                                         
 app = Flask(__name__)
 app.secret_key = "my_secret_key" #used to secure sessions
@@ -33,6 +35,46 @@ def init_db():
         definition TEXT NOT NULL
         )
     """) #storing words inside the quiz
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS results (
+        result_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        quiz_id INTEGER NOT NULL,
+        quiz_type TEXT NOT NULL,
+        score INTEGER NOT NULL,
+        total_questions INTEGER NOT NULL,
+        date_completed TIMESTAMP DEFAULT (datetime('now', 'localtime'))
+    )
+""")
+
+    connection.commit()
+    connection.close()
+
+def save_result(user_id, quiz_id, quiz_type, score, total_questions):
+
+    date_completed = datetime.now(
+        ZoneInfo("Europe/Warsaw")
+    ).strftime("%Y-%m-%d %H:%M:%S")
+
+    connection = sqlite3.connect("database.db")
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        INSERT INTO results
+        (user_id, quiz_id, quiz_type, score, total_questions, date_completed)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            user_id,
+            quiz_id,
+            quiz_type,
+            score,
+            total_questions,
+            date_completed
+        )
+    )
 
     connection.commit()
     connection.close()
@@ -335,6 +377,7 @@ def written_quiz(quiz_id):
         session["score"] = 0
         session["incorrect_word_ids"] = []
         session["feedback"] = []
+        session["result_saved"] = False
 
     if request.method == "POST":
 
@@ -367,14 +410,26 @@ def written_quiz(quiz_id):
 
     if current_question >= len(words):
 
-        return render_template(
-            "quiz_result.html",
-            score=session["score"],
-            total_questions=len(words),
-            feedback=session["feedback"],
-            quiz_id=quiz_id,
-            quiz_type="written"
-        )
+        if not session.get("result_saved", False):
+
+            save_result(
+                session["user_id"],
+                quiz_id,
+                "written",
+                session["score"],
+                len(words)
+            )
+
+            session["results_saved"] = True
+
+            return render_template(
+                "quiz_result.html",
+                score=session["score"],
+                total_questions=len(words),
+                feedback=session["feedback"],
+                quiz_id=quiz_id,
+                quiz_type="written"
+            )
 
     word = words[current_question]
 
@@ -537,6 +592,7 @@ def multiple_choice_quiz(quiz_id):
         session["score"] = 0
         session["feedback"] = []
         session["incorrect_word_ids"] = []
+        session["result_saved"] = False
 
     if request.method == "POST":
 
@@ -572,14 +628,27 @@ def multiple_choice_quiz(quiz_id):
 
     if current_question >= len(questions):
 
-        return render_template(
-            "quiz_result.html",
-            score=session["score"],
-            total_questions=len(questions),
-            feedback=session["feedback"],
-            quiz_id=quiz_id,
-            quiz_type="multiple_choice"
-        )
+        if not session.get("result_saved", False):
+
+            save_result(
+                session["user_id"],
+                quiz_id,
+                "multiple_choice",
+                session["score"],
+                len(questions)
+            )
+
+            session["result_saved"] = True
+
+
+            return render_template(
+                "quiz_result.html",
+                score=session["score"],
+                total_questions=len(questions),
+                feedback=session["feedback"],
+                quiz_id=quiz_id,
+                quiz_type="multiple_choice"
+            )
 
     question = questions[current_question]
 
@@ -731,6 +800,40 @@ def repeat_incorrect_choice(quiz_type, quiz_id):
         return redirect(f"/repeat_incorrect_mc/{quiz_id}")
 
     return redirect("/library")
+
+@app.route("/results")
+def results():
+
+    if "user_id" not in session:
+        return redirect("/login")
+
+    connection = sqlite3.connect("database.db")
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT quizzes.quiz_name,
+               results.quiz_type,
+               results.score,
+               results.total_questions,
+               results.date_completed
+        FROM results
+        JOIN quizzes
+        ON results.quiz_id = quizzes.quiz_id
+        WHERE results.user_id = ?
+        ORDER BY results.result_id DESC
+        """,
+        (session["user_id"],)
+    )
+
+    results = cursor.fetchall()
+
+    connection.close()
+
+    return render_template(
+        "results.html",
+        results=results
+    )
 
 if __name__ == "__main__":
     init_db()
