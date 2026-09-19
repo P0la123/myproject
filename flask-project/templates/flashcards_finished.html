@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}
+Flashcards Finished
+{% endblock %}
+
+{% block content %}
+
+<h1>Flashcards Finished</h1>
+
+<div class="card text-center">
+
+    <div class="card-body">
+
+        <h5 class="card-title">
+            Study Session Complete
+        </h5>
+
+        <p class="card-text">
+            You studied {{ total_cards }} cards.
+        </p>
+
+        <p>
+            <strong>Know:</strong> {{ known_cards }}
+        </p>
+
+        <p>
+            <strong>Don't Know:</strong> {{ difficult_cards }}
+        </p>
+
+
+        {% if difficult_cards > 0 %}
+
+        <a href="/repeat_difficult/{{ quiz_id }}"
+           class="btn btn-pink">
+            Study Difficult Cards Again
+        </a>
+
+        {% endif %}
+
+
+        <a href="/flashcards/{{ quiz_id }}"
+           class="btn btn-lightblue">
+            Study All Again
+        </a>
+
+        <a href="/library"
+           class="btn btn-secondary">
+            Back to Library
+        </a>
+
+    </div>
+
+</div>
+
+{% endblock %}

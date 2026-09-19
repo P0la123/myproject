@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}
+Flashcards
+{% endblock %}
+
+{% block content %}
+
+<h1>Flashcards</h1>
+
+<p class="text-center">
+    Card {{ card_number }} / {{ total_cards }}
+</p>
+
+<div class="card mx-auto" style="width: 30rem;">
+
+<div class="card-body">
+
+    <h5 class="card-title">
+        {{ word[1] }}
+    </h5>
+
+
+    <div id="answer" style="display: none;">
+
+        <h6 class="card-subtitle mb-2 text-muted">
+            Definition / Translation
+        </h6>
+
+        <p class="card-text">
+            {{ word[2] }}
+        </p>
+
+    </div>
+
+
+    <button
+        type="button"
+        id="show-answer-button"
+        class="btn btn-pink"
+        onclick="showAnswer()">
+        Show Answer
+    </button>
+
+
+    <div id="study-buttons" style="display: none;">
+
+        <a href="/flashcard_answer/{{ quiz_id }}/know"
+        class="btn btn-success">
+            Know
+        </a>
+
+        <a href="/flashcard_answer/{{ quiz_id }}/dont_know"
+        class="btn btn-danger">
+            Don't Know
+        </a>
+
+    </div>
+
+</div>
+
+</div>
+
+<script>
+
+function showAnswer() {
+
+    document.getElementById("answer").style.display = "block";
+
+    document.getElementById("show-answer-button").style.display = "none";
+
+    document.getElementById("study-buttons").style.display = "block";
+
+}
+
+</script>
+
+{% endblock %}

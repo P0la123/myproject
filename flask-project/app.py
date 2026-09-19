@@ -45,8 +45,18 @@ def init_db():
         score INTEGER NOT NULL,
         total_questions INTEGER NOT NULL,
         date_completed TIMESTAMP DEFAULT (datetime('now', 'localtime'))
-    )
-""")
+        )
+    """)
+    
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS shared_quizzes (
+        share_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        quiz_id INTEGER NOT NULL,
+        shared_with_user_id INTEGER NOT NULL
+        )
+    """)
+    
+    
 
     connection.commit()
     connection.close()
@@ -834,6 +844,142 @@ def results():
         "results.html",
         results=results
     )
+
+@app.route("/flashcards/<int:quiz_id>")
+def flashcards(quiz_id):
+
+    if "user_id" not in session:
+        return redirect("/login")
+
+    connection = sqlite3.connect("database.db")
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT word_id, term, definition
+        FROM vocabulary
+        WHERE quiz_id = ?
+        """,
+        (quiz_id,)
+    )
+
+    words = cursor.fetchall()
+
+    connection.close()
+
+    random.shuffle(words)
+
+    session["flashcard_words"] = words
+    session["flashcard_position"] = 0
+    session["difficult_words"] = []
+
+    return redirect(f"/flashcard/{quiz_id}")
+
+
+@app.route("/flashcard/<int:quiz_id>")
+def flashcard(quiz_id):
+
+    if "user_id" not in session:
+        return redirect("/login")
+
+    words = session["flashcard_words"]
+    position = session["flashcard_position"]
+
+    if position >= len(words):
+        return redirect(f"/flashcards_finished/{quiz_id}")
+
+    word = words[position]
+
+    return render_template(
+        "flashcards.html",
+        word=word,
+        card_number=position + 1,
+        total_cards=len(words),
+        quiz_id=quiz_id
+    )
+
+
+@app.route("/flashcard_answer/<int:quiz_id>/<answer>")
+def flashcard_answer(quiz_id, answer):
+
+    if "user_id" not in session:
+        return redirect("/login")
+
+    words = session["flashcard_words"]
+    position = session["flashcard_position"]
+
+    word = words[position]
+    word_id = word[0]
+
+    if answer == "dont_know":
+
+        difficult_words = session["difficult_words"]
+
+        if word_id not in difficult_words:
+            difficult_words.append(word_id)
+
+        session["difficult_words"] = difficult_words
+
+    session["flashcard_position"] += 1
+
+    return redirect(f"/flashcard/{quiz_id}")
+
+
+@app.route("/flashcards_finished/<int:quiz_id>")
+def flashcards_finished(quiz_id):
+
+    if "user_id" not in session:
+        return redirect("/login")
+
+    total_cards = len(session["flashcard_words"])
+    difficult_cards = len(session["difficult_words"])
+    known_cards = total_cards - difficult_cards
+
+    return render_template(
+        "flashcards_finished.html",
+        quiz_id=quiz_id,
+        total_cards=total_cards,
+        known_cards=known_cards,
+        difficult_cards=difficult_cards
+    )
+
+
+@app.route("/repeat_difficult/<int:quiz_id>")
+def repeat_difficult(quiz_id):
+
+    if "user_id" not in session:
+        return redirect("/login")
+
+    difficult_ids = session.get("difficult_words", [])
+
+    if not difficult_ids:
+        return redirect(f"/flashcards/{quiz_id}")
+
+    connection = sqlite3.connect("database.db")
+    cursor = connection.cursor()
+
+    placeholders = ",".join(["?"] * len(difficult_ids))
+
+    cursor.execute(
+        f"""
+        SELECT word_id, term, definition
+        FROM vocabulary
+        WHERE word_id IN ({placeholders})
+        """,
+        difficult_ids
+    )
+
+    words = cursor.fetchall()
+
+    connection.close()
+
+    random.shuffle(words)
+
+    session["flashcard_words"] = words
+    session["flashcard_position"] = 0
+    session["difficult_words"] = []
+
+    return redirect(f"/flashcard/{quiz_id}")
 
 if __name__ == "__main__":
     init_db()
