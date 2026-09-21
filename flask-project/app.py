@@ -1,4 +1,5 @@
 import sqlite3, random
+import os
 from classes import QuizSession, Result
 from flask import Flask, render_template, request, session, redirect #request- handles form data, redirect- sends user to another page
 from datetime import datetime
@@ -6,9 +7,11 @@ from zoneinfo import ZoneInfo
                                                                                                                                         
 app = Flask(__name__)
 app.secret_key = "my_secret_key" #used to secure sessions
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATABASE = os.path.join(BASE_DIR, "database.db")
 
 def init_db():
-    connection = sqlite3.connect("database.db")
+    connection = sqlite3.connect(DATABASE)
     cursor = connection.cursor()
 
     cursor.execute("""
@@ -67,7 +70,7 @@ def save_result(user_id, quiz_id, quiz_type, score, total_questions):
         ZoneInfo("Europe/Warsaw")
     ).strftime("%Y-%m-%d %H:%M:%S")
 
-    connection = sqlite3.connect("database.db")
+    connection = sqlite3.connect(DATABASE)
     cursor = connection.cursor()
 
     cursor.execute(
@@ -91,7 +94,7 @@ def save_result(user_id, quiz_id, quiz_type, score, total_questions):
 
 @app.route("/users")
 def users():
-    connection = sqlite3.connect("database.db")
+    connection = sqlite3.connect(DATABASE)
     cursor = connection.cursor()
 
     cursor.execute("SELECT * FROM users")
@@ -111,7 +114,7 @@ def register():
         username = request.form["username"]
         password = request.form["password"]
 
-        connection = sqlite3.connect("database.db")
+        connection = sqlite3.connect(DATABASE)
         cursor = connection.cursor()
 
         cursor.execute(
@@ -132,7 +135,7 @@ def login():
         username = request.form["username"]
         password = request.form["password"]
 
-        connection = sqlite3.connect("database.db")
+        connection = sqlite3.connect(DATABASE)
         cursor = connection.cursor()
 
         cursor.execute(
@@ -175,7 +178,7 @@ def create():
         terms = request.form.getlist("term")
         definitions = request.form.getlist("definition")
 
-        connection = sqlite3.connect("database.db")
+        connection = sqlite3.connect(DATABASE)
         cursor = connection.cursor()
 
         cursor.execute(
@@ -198,22 +201,33 @@ def create():
 
     return render_template("create.html")
 
+
 @app.route("/library")
 def library():
     if "user_id" not in session:
         return redirect("/login")
 
-    connection = sqlite3.connect("database.db")
+    connection = sqlite3.connect(DATABASE)
     cursor = connection.cursor()
 
     cursor.execute(
         """
-        SELECT quiz_id, quiz_name
+        SELECT
+            quizzes.quiz_id,
+            quizzes.quiz_name,
+            quizzes.user_id
         FROM quizzes
-        WHERE user_id = ?
-        ORDER BY quiz_id DESC
+        WHERE quizzes.user_id = ?
+
+        OR quizzes.quiz_id IN (
+            SELECT quiz_id
+            FROM shared_quizzes
+            WHERE shared_with_user_id = ?
+        )
+
+        ORDER BY quizzes.quiz_id DESC
         """,
-        (session["user_id"],)
+        (session["user_id"], session["user_id"])
     )
 
     quizzes = cursor.fetchall()
@@ -222,14 +236,33 @@ def library():
 
     return render_template("library.html", quizzes=quizzes)
 
+
 @app.route("/edit_quiz/<int:quiz_id>")
 def edit_quiz(quiz_id):
 
     if "user_id" not in session:
         return redirect("/login")
 
-    connection = sqlite3.connect("database.db")
+    connection = sqlite3.connect(DATABASE)
     cursor = connection.cursor()
+
+    # Check that the logged-in user owns this quiz
+    cursor.execute(
+        """
+        SELECT quiz_name
+        FROM quizzes
+        WHERE quiz_id = ? AND user_id = ?
+        """,
+        (quiz_id, session["user_id"])
+    )
+
+    quiz = cursor.fetchone()
+
+    if not quiz:
+        connection.close()
+        return redirect("/library")
+
+    quiz_name = quiz[0]
 
     cursor.execute(
         """
@@ -242,17 +275,6 @@ def edit_quiz(quiz_id):
 
     words = cursor.fetchall()
 
-    cursor.execute(
-        """
-        SELECT quiz_name
-        FROM quizzes
-        WHERE quiz_id = ?
-        """,
-        (quiz_id,)
-    )
-
-    quiz_name = cursor.fetchone()[0]
-
     connection.close()
 
     return render_template(
@@ -262,18 +284,36 @@ def edit_quiz(quiz_id):
         quiz_name=quiz_name
     )
 
-@app.route("/delete_word/<int:word_id>")
+
+@app.route("/delete_word/<int:word_id>", methods=["POST"])
 def delete_word(word_id):
 
-    connection = sqlite3.connect("database.db")
+    if "user_id" not in session:
+        return redirect("/login")
+
+    connection = sqlite3.connect(DATABASE)
     cursor = connection.cursor()
 
+    # Find the word's quiz, but only if the logged-in user owns it
     cursor.execute(
-        "SELECT quiz_id FROM vocabulary WHERE word_id = ?",
-        (word_id,)
+        """
+        SELECT vocabulary.quiz_id
+        FROM vocabulary
+        JOIN quizzes
+        ON vocabulary.quiz_id = quizzes.quiz_id
+        WHERE vocabulary.word_id = ?
+        AND quizzes.user_id = ?
+        """,
+        (word_id, session["user_id"])
     )
 
-    quiz_id = cursor.fetchone()[0]
+    word = cursor.fetchone()
+
+    if not word:
+        connection.close()
+        return redirect("/library")
+
+    quiz_id = word[0]
 
     cursor.execute(
         "DELETE FROM vocabulary WHERE word_id = ?",
@@ -285,19 +325,45 @@ def delete_word(word_id):
 
     return redirect(f"/edit_quiz/{quiz_id}")
 
+
+
 @app.route("/edit_word/<int:word_id>", methods=["GET", "POST"])
 def edit_word(word_id):
 
     if "user_id" not in session:
         return redirect("/login")
 
-    connection = sqlite3.connect("database.db")
+    connection = sqlite3.connect(DATABASE)
     cursor = connection.cursor()
 
+    # Find the word only if it belongs to a quiz owned by this user
+    cursor.execute(
+        """
+        SELECT vocabulary.word_id,
+               vocabulary.quiz_id,
+               vocabulary.term,
+               vocabulary.definition
+        FROM vocabulary
+        JOIN quizzes
+        ON vocabulary.quiz_id = quizzes.quiz_id
+        WHERE vocabulary.word_id = ?
+        AND quizzes.user_id = ?
+        """,
+        (word_id, session["user_id"])
+    )
+
+    word = cursor.fetchone()
+
+    if not word:
+        connection.close()
+        return redirect("/library")
+
+    quiz_id = word[1]
+
     if request.method == "POST":
+
         term = request.form["term"]
         definition = request.form["definition"]
-        quiz_id = request.form["quiz_id"]
 
         cursor.execute(
             """
@@ -313,20 +379,10 @@ def edit_word(word_id):
 
         return redirect(f"/edit_quiz/{quiz_id}")
 
-    cursor.execute(
-        """
-        SELECT word_id, quiz_id, term, definition
-        FROM vocabulary
-        WHERE word_id = ?
-        """,
-        (word_id,)
-    )
-
-    word = cursor.fetchone()
-
     connection.close()
 
     return render_template("edit_word.html", word=word)
+
 
 
 @app.route("/add_word/<int:quiz_id>", methods=["GET", "POST"])
@@ -335,17 +391,36 @@ def add_word(quiz_id):
     if "user_id" not in session:
         return redirect("/login")
 
+    connection = sqlite3.connect(DATABASE)
+    cursor = connection.cursor()
+
+    # Check that the logged-in user owns this quiz
+    cursor.execute(
+        """
+        SELECT quiz_id
+        FROM quizzes
+        WHERE quiz_id = ? AND user_id = ?
+        """,
+        (quiz_id, session["user_id"])
+    )
+
+    quiz = cursor.fetchone()
+
+    if not quiz:
+        connection.close()
+        return redirect("/library")
+
     if request.method == "POST":
 
         terms = request.form.getlist("term")
         definitions = request.form.getlist("definition")
 
-        connection = sqlite3.connect("database.db")
-        cursor = connection.cursor()
-
         for i in range(len(terms)):
             cursor.execute(
-                "INSERT INTO vocabulary (quiz_id, term, definition) VALUES (?, ?, ?)",
+                """
+                INSERT INTO vocabulary (quiz_id, term, definition)
+                VALUES (?, ?, ?)
+                """,
                 (quiz_id, terms[i], definitions[i])
             )
 
@@ -353,6 +428,8 @@ def add_word(quiz_id):
         connection.close()
 
         return redirect(f"/edit_quiz/{quiz_id}")
+
+    connection.close()
 
     return render_template("add_word.html", quiz_id=quiz_id)
 
@@ -365,7 +442,7 @@ def written_quiz(quiz_id):
 
     if request.method == "GET":
 
-        connection = sqlite3.connect("database.db")
+        connection = sqlite3.connect(DATABASE)
         cursor = connection.cursor()
 
         cursor.execute(
@@ -465,7 +542,7 @@ def repeat_incorrect_written(quiz_id):
         if not incorrect_ids:
             return redirect(f"/written_quiz/{quiz_id}")
 
-        connection = sqlite3.connect("database.db")
+        connection = sqlite3.connect(DATABASE)
         cursor = connection.cursor()
 
         placeholders = ",".join(["?"] * len(incorrect_ids))
@@ -555,7 +632,7 @@ def multiple_choice_quiz(quiz_id):
 
     if request.method == "GET":
 
-        connection = sqlite3.connect("database.db")
+        connection = sqlite3.connect(DATABASE)
         cursor = connection.cursor()
 
         cursor.execute(
@@ -683,7 +760,7 @@ def repeat_incorrect_mc(quiz_id):
         if not incorrect_ids:
             return redirect(f"/multiple_choice_quiz/{quiz_id}")
 
-        connection = sqlite3.connect("database.db")
+        connection = sqlite3.connect(DATABASE)
         cursor = connection.cursor()
 
         placeholders = ",".join(["?"] * len(incorrect_ids))
@@ -817,7 +894,7 @@ def results():
     if "user_id" not in session:
         return redirect("/login")
 
-    connection = sqlite3.connect("database.db")
+    connection = sqlite3.connect(DATABASE)
     cursor = connection.cursor()
 
     cursor.execute(
@@ -851,7 +928,7 @@ def flashcards(quiz_id):
     if "user_id" not in session:
         return redirect("/login")
 
-    connection = sqlite3.connect("database.db")
+    connection = sqlite3.connect(DATABASE)
     cursor = connection.cursor()
 
     cursor.execute(
@@ -955,7 +1032,7 @@ def repeat_difficult(quiz_id):
     if not difficult_ids:
         return redirect(f"/flashcards/{quiz_id}")
 
-    connection = sqlite3.connect("database.db")
+    connection = sqlite3.connect(DATABASE)
     cursor = connection.cursor()
 
     placeholders = ",".join(["?"] * len(difficult_ids))
@@ -980,6 +1057,99 @@ def repeat_difficult(quiz_id):
     session["difficult_words"] = []
 
     return redirect(f"/flashcard/{quiz_id}")
+
+
+@app.route("/share_quiz/<int:quiz_id>", methods=["GET", "POST"])
+def share_quiz(quiz_id):
+
+    if "user_id" not in session:
+        return redirect("/login")
+
+    connection = sqlite3.connect(DATABASE)
+    cursor = connection.cursor()
+
+    # Get the quiz and check that it belongs to the logged-in user
+    cursor.execute(
+        """
+        SELECT quiz_name
+        FROM quizzes
+        WHERE quiz_id = ? AND user_id = ?
+        """,
+        (quiz_id, session["user_id"])
+    )
+
+    quiz = cursor.fetchone()
+
+    if not quiz:
+        connection.close()
+        return redirect("/library")
+
+    message = None
+
+    if request.method == "POST":
+
+        username = request.form["username"]
+
+        # Find the user
+        cursor.execute(
+            """
+            SELECT user_id
+            FROM users
+            WHERE username = ?
+            """,
+            (username,)
+        )
+
+        user = cursor.fetchone()
+
+        if not user:
+            message = "User not found."
+
+        else:
+            shared_with_user_id = user[0]
+
+            # Do not allow sharing with yourself
+            if shared_with_user_id == session["user_id"]:
+                message = "You cannot share a quiz with yourself."
+
+            else:
+                # Check if the quiz has already been shared with this user
+                cursor.execute(
+                    """
+                    SELECT share_id
+                    FROM shared_quizzes
+                    WHERE quiz_id = ? AND shared_with_user_id = ?
+                    """,
+                    (quiz_id, shared_with_user_id)
+                )
+
+                existing_share = cursor.fetchone()
+
+                if existing_share:
+                    message = "This quiz has already been shared with this user."
+
+                else:
+                    cursor.execute(
+                        """
+                        INSERT INTO shared_quizzes
+                        (quiz_id, shared_with_user_id)
+                        VALUES (?, ?)
+                        """,
+                        (quiz_id, shared_with_user_id)
+                    )
+
+                    connection.commit()
+
+                    message = "Quiz shared successfully."
+
+    connection.close()
+
+    return render_template(
+        "share_quiz.html",
+        quiz_id=quiz_id,
+        quiz_name=quiz[0],
+        message=message
+    )
 
 if __name__ == "__main__":
     init_db()

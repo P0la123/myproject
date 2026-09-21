@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}
+Share Quiz
+{% endblock %}
+
+{% block content %}
+
+<h1>Share Quiz</h1>
+
+<p>
+    Share <strong>{{ quiz_name }}</strong> with another user.
+</p>
+
+{% if message %}
+<div class="alert alert-info">
+    {{ message }}
+</div>
+{% endif %}
+
+<form method="POST">
+
+    <div class="form-group">
+
+        <label for="username">
+            Username
+        </label>
+
+        <input
+            type="text"
+            class="form-control"
+            id="username"
+            name="username"
+            placeholder="Enter username"
+            required>
+
+    </div>
+
+    <button type="submit"
+            class="btn btn-pink">
+        Share Quiz
+    </button>
+
+    <a href="/library"
+       class="btn btn-secondary">
+        Cancel
+    </a>
+
+</form>
+
+{% endblock %}

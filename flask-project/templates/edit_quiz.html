@@ -35,10 +35,15 @@ Edit Quiz
                     Edit
                 </a>
 
-                <a href="/delete_word/{{ word[0] }}"
-                   class="btn btn-danger">
-                    Delete
-                </a>
+                
+                <form action="/delete_word/{{ word[0] }}" method="POST"
+                    style="display: inline;">
+
+                    <button type="submit" class="btn btn-danger">
+                        Delete
+                    </button>
+
+                </form>
                 
             </td>
 
